@@ -14,6 +14,7 @@ The clock has the following functionality:
 * Display brightness is controlled based on sunrise and sunset
 
 To use the Accuweather [API] you require an API key
+
 The key should be defined as an environment variable
 
 See the code for details

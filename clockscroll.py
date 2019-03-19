@@ -39,7 +39,6 @@ wurl = 'http://dataservice.accuweather.com/currentconditions/v1/%s?apikey=%s&det
 wretry = 30 * 60         # fetch weather @ limits of API calls per day
 NTP_MISS = 0
 ntpretry = 60 * 60 * 24  # ntp daily, pi zero can drift
-briteretry = 5 * 60      # check dawn-dusk brightness limits
 lastconditions = ''
 
 
