@@ -1,6 +1,6 @@
 # clockscroll
 
-Simple scrolling clock using Pimironi [schrollphathd]
+Simple scrolling clock using Pimironi [scrollphathd]
 
 The clock is run on a Raspberry Pi W
 
