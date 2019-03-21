@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-# clockscroll v.0.7
+# clockscroll v.0.7 
 # by shunte88
 # 0.5 scrollphathd rewrite
 # 0.6 accuweather retool - wu is no more
@@ -39,6 +39,7 @@ wurl = 'http://dataservice.accuweather.com/currentconditions/v1/%s?apikey=%s&det
 wretry = 30 * 60         # fetch weather @ limits of API calls per day
 NTP_MISS = 0
 ntpretry = 60 * 60 * 24  # ntp daily, pi zero can drift
+briteretry = 5 * 60      # check dawn-dusk brightness limits
 lastconditions = ''
 
 
@@ -86,6 +87,7 @@ class sunAttrTimer():
 
     def set_display_brightness(self):
         # set the brighness attribute
+        global BRIGHTNESS
         BRIGHTNESS = self.bright_value
         time.sleep(2)  # delay tweak, in a thread so no observable
         # reset the event timer
