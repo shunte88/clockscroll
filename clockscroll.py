@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
+
 # clockscroll v.0.7 
 # by shunte88
 # 0.5 scrollphathd rewrite
 # 0.6 accuweather retool - wu is no more
 # 0.7 smarter sunrise/dusk events
+# 0.8 use central weather cache running on NAS
 
 import scrollphathd
 from scrollphathd.fonts import font3x5, font5x7
@@ -15,28 +18,24 @@ import time
 import json
 import signal
 
-try:
-    import urllib.request as urllib2
-except ImportError:
-    import urllib2
-
 import datetime
 import subprocess
 import ntplib  # sync clock every 24 hours, no RTC hat/bonnet here folks!
 
 from threading import Timer, Thread, Event
 
+try:
+    import urllib.request as urllib2
+except ImportError:
+    import urllib2
 
-API_KEY = os.getenv('WEATHER_API_KEY', '')  # Accuweather API key
-LOCATION_ID = os.getenv('WEATHER_LOCATION_ID', '329319')
+
+SHOWSECONDS = int(os.getenv('CLOCK_SHOW_SECONDS', 1))  # show seconds progress
 LATITUDE = float(os.getenv('WEATHER_LATITUDE', '42.361365'))
 LONGITUDE = float(os.getenv('WEATHER_LONGITUDE', '-71.103958'))
-SHOWSECONDS = int(os.getenv('CLOCK_SHOW_SECONDS', 1))  # show seconds progress
-BRIGHTNESS = 0.5  # sunrise, sunset test will set
+URI_WEATHER_CHANNEL = os.getenv('URI_WEATHER_CHANNEL', None)  # Weather Channel URI
 
-wurl = 'http://dataservice.accuweather.com/currentconditions/v1/%s?apikey=%s&details=true' % (LOCATION_ID, API_KEY)
-
-wretry = 30 * 60         # fetch weather @ limits of API calls per day
+wcretry = 5 * 60         # weather cache server 5 minute lookups
 NTP_MISS = 0
 ntpretry = 60 * 60 * 24  # ntp daily, pi zero can drift
 briteretry = 5 * 60      # check dawn-dusk brightness limits
@@ -149,20 +148,16 @@ def getNTP():
 def getAW():
     global wdata
     try:
-        with urllib2.urlopen(wurl) as url:
-            wdata = json.loads(url.read().decode())
+        response = urllib2.urlopen(URI_WEATHER_CHANNEL)
+        wdata = json.loads(response.read().decode())
     except:
         print('Fetch exception')
 
-
 def getConditionAW():
-    # Accuweather version
     global wdata
     try:
-        f = wdata[0]
-        temp = u" {} {}°F {}°C".format(f['WeatherText'].title(),
-                                       f['Temperature']['Imperial']['Value'],
-                                       f['Temperature']['Metric']['Value'])
+        d = wdata['current']
+        temp = u"{} {} {}. ".format(d['temp'],d['phrase'].title(),d['feels'])
         return temp
     except:
         return ''
@@ -266,7 +261,7 @@ try:
     # initialize weather
     getAW()
     # and get latest at intervals
-    wt = perpetualTimer(wretry, getAW)
+    wt = perpetualTimer(wcretry, getAW)
     wt.start()
 
     # time, temp F, temp C and conditions
