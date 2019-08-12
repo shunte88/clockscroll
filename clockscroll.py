@@ -157,7 +157,12 @@ def getConditionAW():
     global wdata
     try:
         d = wdata['current']
-        temp = u"{} {} {}. ".format(d['temp'],d['phrase'].title(),d['feels'])
+        # adding stock ticker support
+        temp = u"{} {} {}. {} {} ".format(d['temp'],
+                                    d['phrase'].title(),
+                                    d['feels'],
+                                    d['ticker'],
+                                    d['price'])
         return temp
     except:
         return ''
