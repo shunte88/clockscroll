@@ -2,7 +2,7 @@
 # -*- encoding: utf-8 -*-
 # -*- coding: utf-8 -*-
 
-# clockscroll v.0.7 
+# clockscroll v.0.8
 # by shunte88
 # 0.5 scrollphathd rewrite
 # 0.6 accuweather retool - wu is no more
@@ -33,7 +33,7 @@ except ImportError:
 SHOWSECONDS = int(os.getenv('CLOCK_SHOW_SECONDS', 1))  # show seconds progress
 LATITUDE = float(os.getenv('WEATHER_LATITUDE', '42.361365'))
 LONGITUDE = float(os.getenv('WEATHER_LONGITUDE', '-71.103958'))
-URI_WEATHER_CHANNEL = os.getenv('URI_WEATHER_CHANNEL', None)  # Weather Channel URI
+URI_WEATHER_CHANNEL = os.getenv('URI_WEATHER_CHANNEL', None)  # Weather URI
 
 wcretry = 5 * 60         # weather cache server 5 minute lookups
 NTP_MISS = 0
@@ -153,16 +153,19 @@ def getAW():
     except:
         print('Fetch exception')
 
+
 def getConditionAW():
     global wdata
     try:
         d = wdata['current']
         # adding stock ticker support
-        temp = u"{} {} {}. {} {} ".format(d['temp'],
-                                    d['phrase'].title(),
-                                    d['feels'],
-                                    d['ticker'],
-                                    d['price'])
+        temp = u"{} {} {} ".format(d['temp'],
+                                   d['phrase'].title(),
+                                   d['feels'])
+        try:
+            temp += "{} {} ".format(d['ticker'], d['price'])
+        except:
+            pass
         return temp
     except:
         return ''
