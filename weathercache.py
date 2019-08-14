@@ -10,14 +10,16 @@ import re
 
 from threading import Timer, Thread, Event
 
+import pandas_market_calendars as mcal
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
 chrome_options = Options()
 chrome_options.headless = True
-'''
-chrome_options.add_argument("--no-sandbox")
-'''
+
+# want the exchange that the stock trades on - q&d here
+nyse = mcal.get_calendar('NYSE')
 
 refresh = int(os.getenv('WEATHER_CACHE_REFRESH', 5))
 wurl = os.getenv('WEATHER_CACHE_URI',
@@ -83,16 +85,11 @@ def cache_weather():
 
 
 def not_market_holiday():
-    global current
-    cache = current
-    # we only want to do this if market open
-    # times a little fuzzy and need weekends and
-    # market holiday incorporation too
     from datetime import datetime
-    from pytz import timezone
-    tz = timezone('EST')
-    now = datetime.now(tz).hour
-    return (now > 8 and now < 18)
+    import pandas as pd
+    stdt = datetime.now().isoformat()
+    early = nyse.schedule(start_date=stdt, end_date=stdt)
+    return nyse.open_at_time(early, pd.Timestamp(stdt, tz=nyse.tz.zone))
 
 
 def cache_google_stock():
@@ -166,5 +163,6 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         sc.cancel()
         wc.cancel()
+        driver.quit()
 
 driver.quit()
