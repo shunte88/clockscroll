@@ -2,12 +2,13 @@
 # -*- encoding: utf-8 -*-
 # -*- coding: utf-8 -*-
 
-# clockscroll v.0.8
+# clockscroll v.0.9
 # by shunte88
 # 0.5 scrollphathd rewrite
 # 0.6 accuweather retool - wu is no more
 # 0.7 smarter sunrise/dusk events
 # 0.8 use central weather cache running on NAS
+# 0.9 expose more weather attributes
 
 import scrollphathd
 from scrollphathd.fonts import font3x5, font5x7
@@ -159,9 +160,11 @@ def getConditionAW():
     try:
         d = wdata['current']
         # adding stock ticker support
-        temp = u"{} {} {} ".format(d['temp'],
-                                   d['phrase'].title(),
-                                   d['feels'])
+        temp = u"{} {} {} Wind {} RH {} ".format(d['temp'],
+                                         d['phrase'].title(),
+                                         d['feels'],
+                                         d['wind'],
+                                         d['humidity'])
         try:
             temp += "{} {} ".format(d['ticker'], d['price'])
         except:

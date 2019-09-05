@@ -28,7 +28,7 @@ ticker = os.getenv('WEATHER_CACHE_TICKER', 'AKAM')
 spurl = 'https://stocktwits.com/symbol/' + ticker
 gurl = 'https://google.com/search?q=' + ticker
 rrr = r",\\\"" + ticker + \
-      r"\\\",\\\"(?P<price>([1-9]*)|(([1-9]*)\.([0-9]*)))\\\","
+      r"\\\",\\\"(?P<price>([1-9]*)|(([0-9]*)\.([0-9]*)))\\\","
 current = {}
 
 driver = webdriver.Chrome(chrome_options=chrome_options)
@@ -79,6 +79,12 @@ def cache_weather():
                     else:
                         t = conds.find(class_=lk).text.replace('°', '°F')
                     current[lk.replace('today_nowcard-', '')] = f'{t}'
+
+                for caption in soup.find_all('caption'):
+                    if 'Right Now' == caption.get_text():
+                        for row in caption.find_parent('table').find_all('tr'):
+                            key = row.find('th').getText().lower()
+                            current[key] = row.find_all('td')[0].text.strip()
     except:
         current = cache
         print('Fetch exception [weather]')
@@ -90,6 +96,18 @@ def not_market_holiday():
     stdt = datetime.now().isoformat()
     early = nyse.schedule(start_date=stdt, end_date=stdt)
     return nyse.open_at_time(early, pd.Timestamp(stdt, tz=nyse.tz.zone))
+
+
+def cache_dad_joke():
+    global current
+    cache = current
+    hurl = 'https://icanhazdadjoke.com'
+    try:
+        with requests.get(hurl, headers={'Accept': 'application/json'}) as url:
+            if 200 == url.status_code:
+                current['joke'] = url.json()['joke']
+    except:
+        current = cache
 
 
 def cache_google_stock():
@@ -151,16 +169,16 @@ if __name__ == '__main__':
         # background event - refresh cache at intervals
         wc = perpetualTimer((refresh*60), cache_weather)
         wc.start()
-        '''
-        cache_stock()
-        sc = perpetualTimer(180, cache_stock)
-        '''
         cache_google_stock()
         sc = perpetualTimer(120, cache_google_stock)
         sc.start()
+        cache_dad_joke()
+        jc = perpetualTimer(120, cache_dad_joke)
+        jc.start()
         app.run(host='0.0.0.0')
 
     except KeyboardInterrupt:
+        jc.cancel()
         sc.cancel()
         wc.cancel()
         driver.quit()
