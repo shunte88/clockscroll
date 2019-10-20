@@ -25,8 +25,8 @@ refresh = int(os.getenv('WEATHER_CACHE_REFRESH', 5))
 wurl = os.getenv('WEATHER_CACHE_URI',
                  'https://weather.com/weather/today/l/02139:4:US')
 ticker = os.getenv('WEATHER_CACHE_TICKER', 'AKAM')
-spurl = 'https://stocktwits.com/symbol/' + ticker
-gurl = 'https://google.com/search?q=' + ticker
+spurl = f'https://stocktwits.com/symbol/{ticker}'
+gurl = f'https://google.com/search?q={ticker}+stock'
 rrr = r",\\\"" + ticker + \
       r"\\\",\\\"(?P<price>([1-9]*)|(([0-9]*)\.([0-9]*)))\\\","
 current = {}
@@ -60,6 +60,23 @@ def lazyFtoC(F):
     return f'{F}°F {C}°C'
 
 
+bft_threshold = (
+    1.01, 3.01, 7.01, 12.01, 18.01, 24.01, 31.01,
+    38.01, 40.01, 54.01, 55.01, 72.01)
+
+
+def wind_beaufort(mph):
+    if mph is None:
+        return None
+
+    # if we have a wind phrase - purify
+    mph = float(re.findall(r'\b\d+\b', f'{mph}')[0])
+    for bft, val in enumerate(bft_threshold):
+        if mph < val:
+            return bft
+    return len(bft_threshold)
+
+
 def cache_weather():
     global current
     cache = current
@@ -80,11 +97,21 @@ def cache_weather():
                         t = conds.find(class_=lk).text.replace('°', '°F')
                     current[lk.replace('today_nowcard-', '')] = f'{t}'
 
+                try:
+                    for icons in conds.find_all('icon', attrs={"class":"icon-svg"}):
+                        icon = re.findall(r'icon-\d+', f'{icons}')[0]
+                        current['icon'] = f'{icon}'
+                except:
+                    pass
+
                 for caption in soup.find_all('caption'):
                     if 'Right Now' == caption.get_text():
                         for row in caption.find_parent('table').find_all('tr'):
                             key = row.find('th').getText().lower()
-                            current[key] = row.find_all('td')[0].text.strip()
+                            val = row.find_all('td')[0].text.strip()
+                            current[key] = val
+                            if 'wind' == key:
+                                current['beafort'] = wind_beaufort(val)
     except:
         current = cache
         print('Fetch exception [weather]')
