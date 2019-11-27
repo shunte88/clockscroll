@@ -61,10 +61,7 @@ def lazyFtoC(F):
 
 
 bft_threshold = (
-    1.01, 3.01, 7.01, 12.01, 18.01, 24.01, 31.01,
-    38.01, 40.01, 54.01, 55.01, 72.01)
-
-
+    1.01, 3.01, 7.01, 12.01, 18.01, 24.01, 31.01, 38.01, 40.01, 54.01, 55.01, 72.01)
 def wind_beaufort(mph):
     if mph is None:
         return None
@@ -112,6 +109,42 @@ def cache_weather():
                             current[key] = val
                             if 'wind' == key:
                                 current['beafort'] = wind_beaufort(val)
+
+                try:
+                    sun = soup.find(class_='dp-details')
+                    current['sunrise'] = sun.find('span',attrs={"class":"wx-dsxdate","id":"dp0-details-sunrise"}).text.strip()
+                    current['sunset'] = sun.find('span',attrs={"class":"wx-dsxdate","id":"dp0-details-sunset"}).text.strip()
+                except:
+                    pass
+
+                try:
+                    lookahead = soup.find(class_='looking-ahead')
+                    try:
+                        for lookperiod in lookahead.find_all('div', attrs={"class":re.compile('today-daypart daypart-\d+.*'),"id":re.compile('daypart-\d+')}):
+                            looker = {}
+                            period = re.findall(r'daypart-\d+',f'{lookperiod}')[0]
+                            pid = period.replace('daypart-','')
+                            looker['id'] = pid
+                            ptitle = lookperiod.find('span',attrs={"class":"today-daypart-title"}).text.strip()
+                            looker['label'] = ptitle
+                            philo = lookperiod.find('div',attrs={"id":f'dp{pid}-highLow'}).text.strip()
+                            looker['hilo'] = philo
+                            ptemp = lookperiod.find('div',attrs={"class":'today-daypart-temp'}).text.strip()
+                            looker['temperature'] = ptemp
+                            pcntprecip = lookperiod.find('span',attrs={"class":"precip-val"}).text.strip()
+                            looker['pcntprecip'] = pcntprecip
+                            try:
+                                for icons in lookperiod.find_all('icon', attrs={"class":re.compile("icon icon-svg.*")}):
+                                    icon = re.findall(r'icon-\d+', f'{icons}')[0]
+                                    looker['icon'] = icon
+                            except:
+                                pass
+                            current[period] = looker
+                    except:
+                        pass
+                except:
+                    pass
+
     except:
         current = cache
         print('Fetch exception [weather]')
