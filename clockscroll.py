@@ -2,13 +2,14 @@
 # -*- encoding: utf-8 -*-
 # -*- coding: utf-8 -*-
 
-# clockscroll v.0.9
+# clockscroll v.0.10
 # by shunte88
-# 0.5 scrollphathd rewrite
-# 0.6 accuweather retool - wu is no more
-# 0.7 smarter sunrise/dusk events
-# 0.8 use central weather cache running on NAS
-# 0.9 expose more weather attributes
+# 0.5  scrollphathd rewrite
+# 0.6  accuweather retool - wu is no more
+# 0.7  smarter sunrise/dusk events
+# 0.8  use central weather cache running on NAS
+# 0.9  expose more weather attributes
+# 0.10 expose covid-19 data
 
 import scrollphathd
 from scrollphathd.fonts import font3x5, font5x7
@@ -167,6 +168,10 @@ def getConditionAW():
                                          d['humidity'])
         try:
             temp += "{} {} ".format(d['ticker'], d['price'])
+        except:
+            pass
+        try:
+            temp += " c19(c:{} r:{} f:{})  ".format(d['c19-confirmed'], d['c19-recovered'], d['c19-deaths'])
         except:
             pass
         return temp

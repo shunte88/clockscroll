@@ -7,6 +7,7 @@ from flask import Flask, jsonify
 from bs4 import BeautifulSoup
 import requests
 import re
+import numpy as np
 
 from threading import Timer, Thread, Event
 
@@ -29,6 +30,13 @@ spurl = f'https://stocktwits.com/symbol/{ticker}'
 gurl = f'https://google.com/search?q={ticker}+stock'
 rrr = r",\\\"" + ticker + \
       r"\\\",\\\"(?P<price>([1-9]*)|(([0-9]*)\.([0-9]*)))\\\","
+
+rrr = r"jsname=\"\S+\"\>(?P<price>([1-9]*)|(([0-9]*)\.([0-9]*)))\<\/span\>"
+
+# nasdaq replacement
+#gurl = f'https://www.nasdaq.com/market-activity/stocks/{ticker}'
+#rrr = r'\<span class="symbol-page-header__pricing-price"\>\$(?P<price>([1-9]*)|(([0-9]*)\.([0-9]*)))\<\/span\>'
+
 current = {}
 
 driver = webdriver.Chrome(chrome_options=chrome_options)
@@ -170,7 +178,47 @@ def cache_dad_joke():
         current = cache
 
 
+def getCovidAttr(c19attr):
+    c19url = f'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-{c19attr}.csv'
+    df={'names': ('Location', 'Country', c19attr),'formats': ('S128', 'S128', 'i')}
+    with requests.get(c19url, headers={'Accept': 'application/text'}) as durl:
+        if 200 == durl.status_code:
+            dataset = np.loadtxt(durl.content.decode('utf-8').splitlines(), dtype=df, delimiter=",", skiprows=1, usecols=(0, 1, -1))
+            return dataset[c19attr].sum()
+    return -1
+
+
+def cache_covid_attr():
+    global current
+    cache = current
+    try:
+        for attr in ('Confirmed','Recovered','Deaths'):
+            val = getCovidAttr(attr)
+            if val>0:
+                current[f'c19-{attr.lower()}'] = int(val)
+    except:
+        print(f'Fetch exception [Covid-19]')
+        current = cache
+
+
+def cache_nasdaq_stock():
+    global current
+    cache = current
+    import traceback
+    if not_market_holiday():
+        try:
+            driver.refresh()
+            page = driver.page_source
+            price = float(re.findall(rrr, page, re.MULTILINE)[0])
+            current['price'] = price
+            current['ticker'] = ticker
+        except:
+            current = cache
+            print(f'Scrape exception [ticker] {ticker}')
+            traceback.print_exc()
+
 def cache_google_stock():
+    # borked - now 100% JS render ???
     global current
     cache = current
     import traceback
@@ -220,6 +268,8 @@ app = Flask(__name__)
 @app.route('/weather/current', methods=['GET'])
 def get_weather():
     global current
+    #print('Serve ...')
+    #print(current)
     return jsonify({'current': current})
 
 
@@ -232,15 +282,21 @@ if __name__ == '__main__':
         cache_google_stock()
         sc = perpetualTimer(120, cache_google_stock)
         sc.start()
+        cache_covid_attr()
+        c19 = perpetualTimer(60*60, cache_covid_attr) # too aggressive!
+        c19.start()
         cache_dad_joke()
         jc = perpetualTimer(120, cache_dad_joke)
         jc.start()
         app.run(host='0.0.0.0')
 
     except KeyboardInterrupt:
+        print('Cleanup')
+        c19.cancel()
         jc.cancel()
         sc.cancel()
         wc.cancel()
         driver.quit()
 
 driver.quit()
+print('Done.')
