@@ -88,6 +88,68 @@ def cache_weather():
     try:
         with requests.get(wurl) as url:
             if 200 == url.status_code:
+
+                # retool 2020-06-10
+                soup = BeautifulSoup(url.text, 'lxml')
+                conds = soup.find('div',attrs={"data-testid":"CurrentConditionsContainer"})
+                current['temp'] = lazyFtoC(conds.find('span',attrs={"data-testid":"TemperatureValue"}).text.strip())
+                current['phrase'] = conds.find('div',attrs={"data-testid":"wxPhrase"}).text.strip()
+
+                try:
+                    for icons in conds.find_all('svg', attrs={"data-testid":"Icon"}):
+                        icon = re.findall(r'skycode="\d+"', f'{icons}')[0]
+                        icon = icon.replace('skycode="','icon-').replace('"','')
+                        current['icon'] = f'{icon}'
+                except:
+                    pass
+
+                conds = soup.find('div',attrs={"data-testid":"FeelsLikeSection"})
+                current['feels'] = conds.find('span',attrs={"data-testid":"TemperatureValue"}).text.strip().replace('°','°F')
+
+                sun = soup.find('div',attrs={"data-testid":"sunriseSunsetContainer"})
+                current['sunrise'] = sun.find('div',attrs={"data-testid":"SunriseValue"}).text.strip()
+                current['sunset'] = sun.find('div',attrs={"data-testid":"SunsetValue"}).text.strip()
+
+                conds = soup.find('section',attrs={"data-testid":"TodaysDetailsModule"})
+
+                for today in conds.find_all('div', attrs={"data-testid":"WeatherDetailsListItem"}):
+                    key = today.find('div',attrs={"data-testid":"WeatherDetailsLabel"}).text.strip().lower()
+                    val = today.find('div',attrs={"data-testid":"wxData"}).text.strip()
+                    current[key] = val
+                    if 'wind' == key:
+                        current['beafort'] = wind_beaufort(val)
+
+                try:
+                    lookahead = soup.find('section',attrs={"data-testid":"DailyWeatherModule"})
+                    try:
+                        pid = 0
+                        for lp in lookahead.find_all('a'):
+                            looker = {}
+                            ptitle = lp.find('span',attrs={"style":"-webkit-line-clamp:2"}).text.strip()
+                            looker['label'] = ptitle
+                            hitemp = lp.find('div',attrs={"data-testid":"SegmentHighTemp"}).text.strip()
+                            lotemp = lp.find('div',attrs={"data-testid":"SegmentLowTemp"}).text.strip()
+                            looker['hilo'] = f'{hitemp}/{lotemp}'
+                            looker['temperature'] = f'{hitemp}'
+                            looker['id'] = pid
+                            pcntprecip = lp.find('div',attrs={"data-testid":"SegmentPrecipPercentage"}).text.strip()
+                            looker['pcntprecip'] = pcntprecip
+                            try:
+                                for icons in conds.find_all('svg', attrs={"data-testid":"Icon","set":"weather"}):
+                                    icon = re.findall(r'skycode="\d+"', f'{icons}')[0]
+                                    icon = icon.replace('skycode="','icon-').replace('"','')
+                                    looker['icon'] = f'{icon}'
+                            except:
+                                pass
+
+                            period = f'daypart-{pid}'
+                            current[period] = looker
+                            pid += 1
+                    except:
+                        pass
+                except:
+                    pass
+                '''
                 soup = BeautifulSoup(url.text, 'lxml')
                 conds = soup.find(class_='today_nowcard-condition')
                 gets = ('today_nowcard-temp',
@@ -152,7 +214,7 @@ def cache_weather():
                         pass
                 except:
                     pass
-
+                '''
     except:
         current = cache
         print('Fetch exception [weather]')
@@ -183,7 +245,8 @@ def getCovidAttr(c19attr):
     df={'names': ('Location', 'Country', c19attr),'formats': ('S128', 'S128', 'i')}
     with requests.get(c19url, headers={'Accept': 'application/text'}) as durl:
         if 200 == durl.status_code:
-            dataset = np.loadtxt(durl.content.decode('utf-8').splitlines(), dtype=df, delimiter=",", skiprows=1, usecols=(0, 1, -1))
+            dataset = np.genfromtxt(durl.content.decode('utf-8').splitlines(), dtype=df, delimiter=",", skip_header=True, usecols=(0, 1, -1))
+            #####################dataset = np.loadtxt(durl.content.decode('utf-8').splitlines(), dtype=df, delimiter=",", skiprows=1, usecols=(0, 1, -1))
             return dataset[c19attr].sum()
     return -1
 
