@@ -82,6 +82,12 @@ def wind_beaufort(mph):
     return len(bft_threshold)
 
 
+def degToCompass(num):
+    val=int((num/22.5)+.5)
+    arr=["N","NNE","NE","ENE","E","ESE", "SE", "SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"]
+    return arr[(val % 16)]
+
+
 def cache_weather():
     global current
     cache = current
@@ -114,10 +120,17 @@ def cache_weather():
 
                 for today in conds.find_all('div', attrs={"data-testid":"WeatherDetailsListItem"}):
                     key = today.find('div',attrs={"data-testid":"WeatherDetailsLabel"}).text.strip().lower()
+                    if 'high / low' == key:
+                        key = 'hilo'
                     val = today.find('div',attrs={"data-testid":"wxData"}).text.strip()
-                    current[key] = val
+                    current[key] = val.replace('°','°F')
                     if 'wind' == key:
                         current['beafort'] = wind_beaufort(val)
+                        direction = re.findall(r'rotate\(\d+deg\)', f'{today}')
+                        if direction:
+                            blows = direction[0].replace('rotate(','').replace('deg)','')
+                            blows = degToCompass(int(blows))
+                            current['wind'] = f"{blows} {current['wind']}"
 
                 try:
                     lookahead = soup.find('section',attrs={"data-testid":"DailyWeatherModule"})
