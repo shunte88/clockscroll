@@ -129,6 +129,7 @@ def cache_weather():
                         direction = re.findall(r'rotate\(\d+deg\)', f'{today}')
                         if direction:
                             blows = direction[0].replace('rotate(','').replace('deg)','')
+                            current['winddegrees'] = f"{blows}"
                             blows = degToCompass(int(blows))
                             current['wind'] = f"{blows} {current['wind']}"
 
