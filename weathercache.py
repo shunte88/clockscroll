@@ -27,15 +27,9 @@ wurl = os.getenv('WEATHER_CACHE_URI',
                  'https://weather.com/weather/today/l/02139:4:US')
 ticker = os.getenv('WEATHER_CACHE_TICKER', 'AKAM')
 spurl = f'https://stocktwits.com/symbol/{ticker}'
-gurl = f'https://google.com/search?q={ticker}+stock'
-rrr = r",\\\"" + ticker + \
-      r"\\\",\\\"(?P<price>([1-9]*)|(([0-9]*)\.([0-9]*)))\\\","
+gurl = f'https://google.com/search?q={ticker}+stock+price'
 
-rrr = r"jsname=\"\S+\"\>(?P<price>([1-9]*)|(([0-9]*)\.([0-9]*)))\<\/span\>"
-
-# nasdaq replacement
-#gurl = f'https://www.nasdaq.com/market-activity/stocks/{ticker}'
-#rrr = r'\<span class="symbol-page-header__pricing-price"\>\$(?P<price>([1-9]*)|(([0-9]*)\.([0-9]*)))\<\/span\>'
+rrr = r"jsname=\"\S+\" class=\".*?\"\>(?P<price>([1-9]*)|(([0-9]*)\.([0-9]*)))\<\/span\>\<span jsname=\"\S+\" class="
 
 current = {}
 
@@ -95,7 +89,6 @@ def cache_weather():
         with requests.get(wurl) as url:
             if 200 == url.status_code:
 
-                # retool 2020-06-10
                 soup = BeautifulSoup(url.text, 'lxml')
                 conds = soup.find('div',attrs={"data-testid":"CurrentConditionsContainer"})
                 current['temp'] = lazyFtoC(conds.find('span',attrs={"data-testid":"TemperatureValue"}).text.strip())
@@ -103,9 +96,9 @@ def cache_weather():
 
                 try:
                     for icons in conds.find_all('svg', attrs={"data-testid":"Icon"}):
-                        icon = re.findall(r'skycode="\d+"', f'{icons}')[0]
-                        icon = icon.replace('skycode="','icon-').replace('"','')
-                        current['icon'] = f'{icon}'
+                        icon = re.match(r'.*skycode="(\d+)".*', f'{icons}')
+                        if icon.group:
+                            current['icon'] = f"icon-{icon.group(1)}"
                 except:
                     pass
 
@@ -126,10 +119,10 @@ def cache_weather():
                     current[key] = val.replace('°','°F')
                     if 'wind' == key:
                         current['beafort'] = wind_beaufort(val)
-                        direction = re.findall(r'rotate\(\d+deg\)', f'{today}')
-                        if direction:
-                            blows = direction[0].replace('rotate(','').replace('deg)','')
-                            current['winddegrees'] = f"{blows}"
+                        direction = re.match(r'.*rotate\((\d+)deg\).*', f'{today}')
+                        if direction.group:
+                            blows = direction.group(1)
+                            current['wind degrees'] = int(blows)
                             blows = degToCompass(int(blows))
                             current['wind'] = f"{blows} {current['wind']}"
 
@@ -141,18 +134,18 @@ def cache_weather():
                             looker = {}
                             ptitle = lp.find('span',attrs={"style":"-webkit-line-clamp:2"}).text.strip()
                             looker['label'] = ptitle
-                            hitemp = lp.find('div',attrs={"data-testid":"SegmentHighTemp"}).text.strip()
-                            lotemp = lp.find('div',attrs={"data-testid":"SegmentLowTemp"}).text.strip()
+                            hitemp = lp.find('div',attrs={"data-testid":"SegmentHighTemp"}).text.strip().replace('°','°F')
+                            lotemp = lp.find('div',attrs={"data-testid":"SegmentLowTemp"}).text.strip().replace('°','°F')
                             looker['hilo'] = f'{hitemp}/{lotemp}'
                             looker['temperature'] = f'{hitemp}'
                             looker['id'] = pid
                             pcntprecip = lp.find('div',attrs={"data-testid":"SegmentPrecipPercentage"}).text.strip()
                             looker['pcntprecip'] = pcntprecip
                             try:
-                                for icons in conds.find_all('svg', attrs={"data-testid":"Icon","set":"weather"}):
-                                    icon = re.findall(r'skycode="\d+"', f'{icons}')[0]
-                                    icon = icon.replace('skycode="','icon-').replace('"','')
-                                    looker['icon'] = f'{icon}'
+                                for icons in lp.find_all('svg', attrs={"data-testid":"Icon","set":"weather"}):
+                                    icon = re.match(r'.*skycode="(\d+)".*', f'{icons}')
+                                    if icon.group:
+                                        looker['icon'] = f"icon-{icon.group(1)}"
                             except:
                                 pass
 
@@ -163,75 +156,10 @@ def cache_weather():
                         pass
                 except:
                     pass
-                '''
-                soup = BeautifulSoup(url.text, 'lxml')
-                conds = soup.find(class_='today_nowcard-condition')
-                gets = ('today_nowcard-temp',
-                        'today_nowcard-phrase',
-                        'today_nowcard-feels',
-                        )
 
-                for lk in gets:
-                    if lk == gets[0]:
-                        t = lazyFtoC(conds.find(class_=lk).text)
-                    else:
-                        t = conds.find(class_=lk).text.replace('°', '°F')
-                    current[lk.replace('today_nowcard-', '')] = f'{t}'
-
-                try:
-                    for icons in conds.find_all('icon', attrs={"class":"icon-svg"}):
-                        icon = re.findall(r'icon-\d+', f'{icons}')[0]
-                        current['icon'] = f'{icon}'
-                except:
-                    pass
-
-                for caption in soup.find_all('caption'):
-                    if 'Right Now' == caption.get_text():
-                        for row in caption.find_parent('table').find_all('tr'):
-                            key = row.find('th').getText().lower()
-                            val = row.find_all('td')[0].text.strip()
-                            current[key] = val
-                            if 'wind' == key:
-                                current['beafort'] = wind_beaufort(val)
-
-                try:
-                    sun = soup.find(class_='dp-details')
-                    current['sunrise'] = sun.find('span',attrs={"class":"wx-dsxdate","id":"dp0-details-sunrise"}).text.strip()
-                    current['sunset'] = sun.find('span',attrs={"class":"wx-dsxdate","id":"dp0-details-sunset"}).text.strip()
-                except:
-                    pass
-
-                try:
-                    lookahead = soup.find(class_='looking-ahead')
-                    try:
-                        for lookperiod in lookahead.find_all('div', attrs={"class":re.compile('today-daypart daypart-\d+.*'),"id":re.compile('daypart-\d+')}):
-                            looker = {}
-                            period = re.findall(r'daypart-\d+',f'{lookperiod}')[0]
-                            pid = period.replace('daypart-','')
-                            looker['id'] = pid
-                            ptitle = lookperiod.find('span',attrs={"class":"today-daypart-title"}).text.strip()
-                            looker['label'] = ptitle
-                            philo = lookperiod.find('div',attrs={"id":f'dp{pid}-highLow'}).text.strip()
-                            looker['hilo'] = philo
-                            ptemp = lookperiod.find('div',attrs={"class":'today-daypart-temp'}).text.strip()
-                            looker['temperature'] = ptemp
-                            pcntprecip = lookperiod.find('span',attrs={"class":"precip-val"}).text.strip()
-                            looker['pcntprecip'] = pcntprecip
-                            try:
-                                for icons in lookperiod.find_all('icon', attrs={"class":re.compile("icon icon-svg.*")}):
-                                    icon = re.findall(r'icon-\d+', f'{icons}')[0]
-                                    looker['icon'] = icon
-                            except:
-                                pass
-                            current[period] = looker
-                    except:
-                        pass
-                except:
-                    pass
-                '''
     except:
         current = cache
-        print('Fetch exception [weather]')
+        print(f'Fetch exception [weather]\n{sys.exc_info()[0]}\n')
 
 
 def not_market_holiday():
@@ -286,7 +214,8 @@ def cache_nasdaq_stock():
         try:
             driver.refresh()
             page = driver.page_source
-            price = float(re.findall(rrr, page, re.MULTILINE)[0])
+            pp = re.findall(rrr, page, re.MULTILINE)
+            price = float(pp[0][0])
             current['price'] = price
             current['ticker'] = ticker
         except:
