@@ -14,10 +14,13 @@ from threading import Timer, Thread, Event
 import pandas_market_calendars as mcal
 
 from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 
-chrome_options = Options()
-chrome_options.headless = True
+chrzopt = Options()
+chrzopt.headless = True
+
+driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=chrzopt)
 
 # want the exchange that the stock trades on - q&d here
 nyse = mcal.get_calendar('NYSE')
@@ -25,7 +28,7 @@ nyse = mcal.get_calendar('NYSE')
 refresh = int(os.getenv('WEATHER_CACHE_REFRESH', 5))
 wurl = os.getenv('WEATHER_CACHE_URI',
                  'https://weather.com/weather/today/l/02139:4:US')
-ticker = os.getenv('WEATHER_CACHE_TICKER', 'AKAM')
+ticker = os.getenv('WEATHER_CACHE_TICKER', 'AAPL')
 spurl = f'https://stocktwits.com/symbol/{ticker}'
 gurl = f'https://google.com/search?q={ticker}+stock+price'
 
@@ -33,7 +36,7 @@ rrr = r"jsname=\"\S+\" class=\".*?\"\>(?P<price>([1-9]*)|(([0-9]*)\.([0-9]*)))\<
 
 current = {}
 
-driver = webdriver.Chrome(chrome_options=chrome_options)
+#driver = webdriver.Chrome(chrome_options=chrome_options)
 driver.get(gurl)
 
 
@@ -67,9 +70,7 @@ bft_threshold = (
 def wind_beaufort(mph):
     if mph is None:
         return None
-
-    # if we have a wind phrase - purify
-    mph = float(re.findall(r'\b\d+\b', f'{mph}')[0])
+    mph = float(mph) # addressed 21/01/2021
     for bft, val in enumerate(bft_threshold):
         if mph < val:
             return bft
@@ -91,6 +92,7 @@ def cache_weather():
 
                 soup = BeautifulSoup(url.text, 'lxml')
                 conds = soup.find('div',attrs={"data-testid":"CurrentConditionsContainer"})
+
                 current['temp'] = lazyFtoC(conds.find('span',attrs={"data-testid":"TemperatureValue"}).text.strip())
                 current['phrase'] = conds.find('div',attrs={"data-testid":"wxPhrase"}).text.strip()
 
@@ -111,6 +113,8 @@ def cache_weather():
 
                 conds = soup.find('section',attrs={"data-testid":"TodaysDetailsModule"})
 
+                # graphic name strings crept into the mix ~ 18/01/2021
+                # wind direction, pressure mainly affected - minor retool
                 for today in conds.find_all('div', attrs={"data-testid":"WeatherDetailsListItem"}):
                     key = today.find('div',attrs={"data-testid":"WeatherDetailsLabel"}).text.strip().lower()
                     if 'high / low' == key:
@@ -118,13 +122,19 @@ def cache_weather():
                     val = today.find('div',attrs={"data-testid":"wxData"}).text.strip()
                     current[key] = val.replace('°','°F')
                     if 'wind' == key:
-                        current['beafort'] = wind_beaufort(val)
+                        current[key] = re.findall(r'[\w|\b]\d+\b', f'{val}')[0][1]
+                        current['beafort'] = wind_beaufort(current[key])
                         direction = re.match(r'.*rotate\((\d+)deg\).*', f'{today}')
                         if direction.group:
                             blows = direction.group(1)
                             current['wind degrees'] = int(blows)
                             blows = degToCompass(int(blows))
                             current['wind'] = f"{blows} {current['wind']}"
+
+                    elif 'pressure' == key:
+                        current[key] = re.findall(r'[^|\w|\b]\d+', f'{val}')[0][1] # deal with Arrow [Up|Down]
+
+                    print(f"{key:} {(16-len(key)) * '.'}: {current[key]}")
 
                 try:
                     lookahead = soup.find('section',attrs={"data-testid":"DailyWeatherModule"})
@@ -294,7 +304,7 @@ if __name__ == '__main__':
         cache_dad_joke()
         jc = perpetualTimer(120, cache_dad_joke)
         jc.start()
-        app.run(host='0.0.0.0')
+        app.run(host='0.0.0.0', debug=True)
 
     except KeyboardInterrupt:
         print('Cleanup')
